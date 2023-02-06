@@ -1,0 +1,9 @@
+/venv/
+/checkpoints/
+/logs/
+/.cache/
+/.keras/
+/.local/
+/.nv/
+/__pycache__/
+/.idea/
