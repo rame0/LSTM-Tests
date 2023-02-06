@@ -60,15 +60,15 @@ validate_ts = validate_ts.reshape((validate_ts.shape[0], validate_ts.shape[1], n
 patience = 6
 
 # Config hyperparameters
-HP_NUM_UNITS = hp.HParam('num_units', hp.Discrete([16, 32, 64]))
+HP_NUM_UNITS = hp.HParam('num_units', hp.Discrete([32, 64]))
 HP_BATCH_SIZE = hp.HParam('batch_size', hp.Discrete([
     # int(len(train_ts) / 5000),
     # int(len(train_ts) / 1000),
-    int(len(train_ts) / 100),
     int(len(train_ts) / 50),
+    int(len(train_ts) / 100),
 ]))
 HP_DROPOUT = hp.HParam('dropout', hp.Discrete([0.0, 0.1, 0.2]))
-HP_OPTIMIZER = hp.HParam('optimizer', hp.Discrete(['Adam', 'SGD']))
+HP_OPTIMIZER = hp.HParam('optimizer', hp.Discrete(['Adam']))
 HP_EPOCHS = hp.HParam('epochs', hp.Discrete(range(100, 500, 100)))
 HP_LEARNING_RATE = hp.HParam('learning_rate', hp.Discrete([0.0001, 0.001]))
 HP_DENSE_LAYERS = hp.HParam('dense_layers', hp.Discrete([0, 1, 2]))
