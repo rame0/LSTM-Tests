@@ -1,5 +1,8 @@
+while IFS== read -r key value; do
+  printf -v "$key" %s "$value" && export "$key"
+done <../.env
+
 figi_list=figi.txt
-token=t.0n9y3pZvt_Lf-I4NcMRvJ4TEscQYZbcJRLpHjMA2U23c67bvB5VHCZ1NlRkTlwJ0g11v8po_irhcjUusajCThg
 
 current_year=$(date +%Y)
 url=https://invest-public-api.tinkoff.ru/history-data

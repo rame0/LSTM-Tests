@@ -7,3 +7,5 @@
 /.nv/
 /__pycache__/
 /.idea/
+
+.env
