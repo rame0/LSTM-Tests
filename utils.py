@@ -65,7 +65,6 @@ def get_raw_stock_data(filename, folder='data', columns=None):
     return df, columns
 
 
-
 # split a univariate sequence
 def split_sequence(sequence, n_steps, predict_step=5):
     X, y = list(), list()
@@ -91,6 +90,43 @@ def split_sequence(sequence, n_steps, predict_step=5):
             seq_y = [1, 0, 0]  # sell
         else:
             seq_y = [0, 1, 0]  # hold
+
+        X.append(seq_x)
+        y.append(seq_y)
+    return array(X), array(y)
+
+
+# split a univariate sequence
+def split_sequence_v4(sequence, n_steps, predict_step=5):
+    X, y = list(), list()
+    for i in range(len(sequence)):
+        # find the end of this pattern
+        end_ix = i + n_steps
+        # check if we are beyond the sequence
+        if end_ix > len(sequence) - predict_step:
+            break
+        # gather input and output parts of the pattern
+        seq_x = sequence[i:end_ix]
+        seq_y = sequence[end_ix:predict_step + end_ix]
+
+        current_price = seq_x[-1]
+
+        if sum(seq_y) / len(seq_y) > current_price + current_price * 0.2:
+            seq_y = [0, 0, 0, 0, 0, 0, 1]  # buy
+        elif sum(seq_y) / len(seq_y) > current_price + current_price * 0.1:
+            seq_y = [0, 0, 0, 0, 0, 1, 0]  # buy
+        elif sum(seq_y) / len(seq_y) > current_price + current_price * 0.05:
+            seq_y = [0, 0, 0, 0, 1, 0, 0]  # buy
+
+        elif sum(seq_y) / len(seq_y) < current_price - current_price * 0.05:
+            seq_y = [0, 0, 1, 0, 0, 0, 0]  # sell
+        elif sum(seq_y) / len(seq_y) < current_price - current_price * 0.1:
+            seq_y = [0, 1, 0, 0, 0, 0, 0]  # sell
+        elif sum(seq_y) / len(seq_y) < current_price - current_price * 0.2:
+            seq_y = [1, 0, 0, 0, 0, 0, 0]  # sell
+
+        else:
+            seq_y = [0, 0, 0, 1, 0, 0, 0]  # hold
 
         X.append(seq_x)
         y.append(seq_y)
