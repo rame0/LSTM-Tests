@@ -110,7 +110,6 @@ with tf.summary.create_file_writer(f"{logs_base_dir}/{tuning_name}").as_default(
 # )
 
 def run_train(log_dir, checkpoints_dir, h_params):
-
     model = Sequential()
     # input layer
     # tcuDNN LSTM only support tanh as activation function
@@ -160,9 +159,11 @@ def run_train(log_dir, checkpoints_dir, h_params):
     return loss, accuracy, validation_loss, validation_accuracy
 
 
-def run(run_dir, checkpoints_dir, h_params):
+def run(run_name, h_params):
+    run_dir = f"{logs_base_dir}/{tuning_name}/{run_name}"
+    checkpoints_dir = f"{checkpoints_base_dir}/{tuning_name}/{run_name}"
     with tf.summary.create_file_writer(run_dir).as_default():
-        hp.hparams(h_params)  # record the values used in this trial
+        hp.hparams(h_params, trial_id=f"{tuning_name}/{run_name}")  # record the values used in this trial
         loss, accuracy, validation_loss, validation_accuracy = run_train(run_dir, checkpoints_dir, h_params)
 
         tf.summary.scalar(METRIC_ACCURACY, accuracy, step=1)
@@ -196,11 +197,9 @@ for epoch in HP_EPOCHS.domain.values:
                                 HP_DENSE_LAYERS: dense_layers,
                                 HP_BATCH_SIZE: batch_size,
                             }
-                            run_name = "run-%d" % session_num
-                            print(f"--- Starting trial: {run_name}")
+                            RUN_NAME = "run-%d" % session_num
+                            print(f"--- Starting trial: {RUN_NAME}")
                             print(f"--- Session {session_num} of {total_sessions}")
                             print({h.name: hparams[h] for h in hparams})
-                            run(f"{logs_base_dir}/{tuning_name}/{run_name}",
-                                f"{checkpoints_base_dir}/{tuning_name}/{run_name}/",
-                                hparams)
+                            run(RUN_NAME, hparams)
                             session_num += 1
