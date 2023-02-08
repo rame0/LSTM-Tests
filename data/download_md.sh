@@ -1,12 +1,13 @@
 #!/bin/bash
 # Скачиваем исторические данные по инструментам из файла figi.txt.
+# !! ВНИМАНИЕ !! Файл figi.txt должен завершаться пустой строкой.
+# Иначе данные по последнему инструменту не будут скачаны.
+#
 # Для каждого инструмента создается отдельный файл с данными за каждый год.
 # Данные скачиваются в формате zip.
 # Для скачивания данных необходимо получить токен.
 # Подробости по получению токена: https://tinkoff.github.io/investAPI/token/
 # После получения токена необходимо сохранить его в файл .env в корне проекта.
-
-pwd
 
 while IFS== read -r key value; do
   printf -v "$key" %s "$value" && export "$key"
@@ -17,8 +18,11 @@ figi_list=figi.txt
 current_year=$(date +%Y)
 url=https://invest-public-api.tinkoff.ru/history-data
 function download {
-  local figi=$1
-  local year=$2
+  local ticker=$1
+  local figi=$2
+  local year=$3
+
+  # Если папка для сохранения данных не существует - создаем ее.
   mkdir -p $figi
   local file_name=${figi}/${figi}_${year}.zip
   echo "downloading $figi for year $year"
@@ -26,13 +30,13 @@ function download {
       -H "Authorization: Bearer ${token}" -o "${file_name}" -w '%{http_code}\n')
   if [ "$response_code" = "200" ]; then
     ((year--))
-    download "$figi" "$year";
+    download "$ticker" "$figi" "$year";
   fi
   # Если превышен лимит запросов в минуту (30) - повторяем запрос.
   if [ "$response_code" = "429" ]; then
       echo "rate limit exceed. sleep 5"
       sleep 5
-      download "$figi" "$year";
+      download "$ticker" "$figi" "$year";
       return 0
   fi
   # Если невалидный токен - выходим.
@@ -44,13 +48,13 @@ function download {
   if [ "$response_code" = "404" ]; then
       echo "data not found for figi=${figi}, year=${year}, skipped"
       rm $file_name
-      unzip "$figi/*.zip" -d "$figi"
-      cat $figi/*.csv > "${figi}_1m.csv"
-#      tr ';' ',' < "${figi}_1m.csv"
+      unzip -uoq "$figi/*.zip" -d "$figi"
 
+      final_file_name="${ticker}_${figi}_1m.csv"
 
-      sed -i 's/;/,/g' "${figi}_1m.csv"
-      sed -i '1iDate,Open,Close,High,Low,Vol,' "${figi}_1m.csv"
+      cat $figi/*.csv > $final_file_name
+      sed -i 's/;/,/g' $final_file_name
+      sed -i '1iDate,Open,Close,High,Low,Vol,' $final_file_name
 
       rm -rf $figi
 
@@ -62,7 +66,7 @@ function download {
   fi
 }
 
-while read -r figi; do
+while IFS== read -r ticker figi; do
   rm -rf "$figi/"
-  download "$figi" "$current_year"
+  download "$ticker" "$figi" "$current_year"
 done < ${figi_list}
