@@ -28,7 +28,7 @@ TIMESTAMP = int(time.time())
 n_features = 1
 
 # Config hyperparameters
-HP_BATCH_SIZE = hp.HParam('batch_size', hp.Discrete([100, 1000, 10000, ]))
+HP_BATCH_SIZE = hp.HParam('batch_size', hp.Discrete([-1, 10000, 1000]))
 HP_PREDICTION_WINDOW = hp.HParam('prediction_window', hp.Discrete([5, 10, 15, 30]))
 HP_WINDOW_SIZE = hp.HParam('window_size', hp.Discrete([15, 30, 60, 120, 360]))
 HP_DATA_FILES = hp.HParam('data_files', hp.Discrete([
@@ -114,7 +114,6 @@ total_sessions = len(HP_BATCH_SIZE.domain.values) * \
                  len(HP_LEARNING_RATE.domain.values) * \
                  len(HP_DENSE_LAYERS.domain.values)
 
-
 for prediction_window in HP_PREDICTION_WINDOW.domain.values:
     for window_size in HP_WINDOW_SIZE.domain.values:
         for data_file in HP_DATA_FILES.domain.values:
@@ -171,6 +170,8 @@ for prediction_window in HP_PREDICTION_WINDOW.domain.values:
                         for dropout_rate in HP_DROPOUT.domain.values:
                             for num_units in HP_NUM_UNITS.domain.values:
                                 for dense_layers in HP_DENSE_LAYERS.domain.values:
+                                    if batch_size <= 0:
+                                        batch_size = len(train_ts)
                                     hparams = {
                                         HP_PREDICTION_WINDOW: prediction_window,
                                         HP_WINDOW_SIZE: window_size,
@@ -182,6 +183,7 @@ for prediction_window in HP_PREDICTION_WINDOW.domain.values:
                                         HP_DENSE_LAYERS: dense_layers,
                                         HP_BATCH_SIZE: batch_size,
                                     }
+
                                     RUN_NAME = "run-%d" % session_num
                                     print(f"--- Starting trial: {RUN_NAME}")
                                     print(f"--- Session {session_num} of {total_sessions}")
