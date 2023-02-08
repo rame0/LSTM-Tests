@@ -54,7 +54,7 @@ function download {
 
       cat $figi/*.csv > $final_file_name
       sed -i 's/;/,/g' $final_file_name
-      sed -i '1iDate,Open,Close,High,Low,Vol,' $final_file_name
+      sed -i '1iId,Date,Open,Close,High,Low,Vol,' $final_file_name
 
       rm -rf $figi
 
