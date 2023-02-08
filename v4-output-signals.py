@@ -27,7 +27,7 @@ if not os.path.exists(checkpoints_base_dir):
 
 scaled_data, cols = u.get_raw_stock_data(
     # 'USD000000TOD_200701_220730_5m.txt',
-    'BBG004730N88.csv',
+    'BBG004730N88_1m.csv',
     columns=['Close']
 )
 df = pd.DataFrame(scaled_data, columns=cols)

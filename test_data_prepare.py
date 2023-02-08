@@ -60,66 +60,42 @@ validate_ts = validate_ts.reshape((validate_ts.shape[0], validate_ts.shape[1], n
 patience = 6
 
 # Config hyperparameters
-HP_NUM_UNITS = hp.HParam('num_units', hp.Discrete([32, 64]))
-HP_BATCH_SIZE = hp.HParam('batch_size', hp.Discrete([
-    # int(len(train_ts) / 5000),
-    # int(len(train_ts) / 1000),
-    int(len(train_ts) / 50),
-    int(len(train_ts) / 100),
-]))
-HP_DROPOUT = hp.HParam('dropout', hp.Discrete([0.0, 0.1, 0.2]))
-HP_OPTIMIZER = hp.HParam('optimizer', hp.Discrete(['Adam']))
-HP_EPOCHS = hp.HParam('epochs', hp.Discrete(range(100, 500, 100)))
-HP_LEARNING_RATE = hp.HParam('learning_rate', hp.Discrete([0.0001, 0.001]))
-HP_DENSE_LAYERS = hp.HParam('dense_layers', hp.Discrete([0, 1, 2]))
-
+TESTS_CONFIG = {
+    "HP_DATA_FILES": hp.HParam('data_files', hp.Discrete([
+        'SPBE_BBG002GHV6L9_1m.csv',
+        'MVID_BBG004S68CP5_1m.csv',
+    ])),
+    "HP_NUM_UNITS": hp.HParam('num_units', hp.Discrete([32])),
+    "HP_BATCH_SIZE": hp.HParam('batch_size', hp.Discrete([
+        int(len(train_ts) / 50),
+        int(len(train_ts) / 100),
+        # int(len(train_ts) / 500),
+        # int(len(train_ts) / 1000),
+        # int(len(train_ts) / 5000),
+    ])),
+    "HP_DROPOUT": hp.HParam('dropout', hp.Discrete([0.1])),
+    "HP_EPOCHS": hp.HParam('epochs', hp.Discrete([100])),
+    "HP_LEARNING_RATE": hp.HParam('learning_rate', hp.Discrete([0.0001])),
+    "HP_DENSE_LAYERS": hp.HParam('dense_layers', hp.Discrete([2])),
+}
 METRIC_ACCURACY = 'accuracy'
 METRIC_LOSS = 'loss'
 METRIC_VAL_ACCURACY = 'val_accuracy'
 METRIC_VAL_LOSS = 'val_loss'
 
-tuning_name = 'tuning_' + str(TIMESTAMP)
-
-# config tensorboard logs
-with tf.summary.create_file_writer(f"{logs_base_dir}/{tuning_name}").as_default():
-    hp.hparams_config(
-        hparams=[HP_NUM_UNITS, HP_DROPOUT, HP_OPTIMIZER, HP_EPOCHS, HP_LEARNING_RATE, HP_DENSE_LAYERS, HP_BATCH_SIZE],
-        metrics=[
-            hp.Metric(METRIC_ACCURACY, display_name='Accuracy'),
-            hp.Metric(METRIC_LOSS, display_name='Loss'),
-            hp.Metric(METRIC_VAL_ACCURACY, display_name='VAL Accuracy'),
-            hp.Metric(METRIC_VAL_LOSS, display_name='VAL Loss')
-        ],
-    )
-
-
-#
-# early_stopping = tf.keras.callbacks.EarlyStopping(
-#     monitor='val_loss',
-#     patience=patience,
-#     mode='min'
-# )
-#
-# learning_rate_reduction = tf.keras.callbacks.ReduceLROnPlateau(
-#     monitor='loss',
-#     patience=patience,
-#     verbose=1,
-#     factor=0.5,
-#     min_lr=0.0000001
-# )
 
 def run_train(log_dir, checkpoints_dir, h_params):
     model = Sequential()
-    model.add(LSTM(h_params[HP_NUM_UNITS], activation='tanh', input_shape=(n_steps, n_features)))
-    model.add(Dropout(h_params[HP_DROPOUT]))
+    model.add(LSTM(h_params[TESTS_CONFIG.HP_NUM_UNITS], activation='tanh', input_shape=(n_steps, n_features)))
+    model.add(Dropout(h_params[TESTS_CONFIG.HP_DROPOUT]))
 
-    for i in range(h_params[HP_DENSE_LAYERS]):
-        model.add(Dense(h_params[HP_NUM_UNITS], activation='relu'))
-        model.add(Dropout(h_params[HP_DROPOUT]))
+    for i in range(h_params[TESTS_CONFIG.HP_DENSE_LAYERS]):
+        model.add(Dense(h_params[TESTS_CONFIG.HP_NUM_UNITS], activation='relu'))
+        model.add(Dropout(h_params[TESTS_CONFIG.HP_DROPOUT]))
 
     model.add(Dense(3, activation='softmax'))
     model.compile(
-        optimizer=getattr(tf.optimizers, h_params[HP_OPTIMIZER])(learning_rate=h_params[HP_LEARNING_RATE]),
+        optimizer=tf.optimizers.Adam(learning_rate=h_params[TESTS_CONFIG.HP_LEARNING_RATE]),
         loss=tf.losses.CategoricalCrossentropy(),
         metrics=keras.metrics.categorical_accuracy
     )
@@ -127,8 +103,8 @@ def run_train(log_dir, checkpoints_dir, h_params):
     history = model.fit(
         train_ts,
         train_value,
-        epochs=h_params[HP_EPOCHS],
-        batch_size=h_params[HP_BATCH_SIZE],
+        epochs=h_params[TESTS_CONFIG.HP_EPOCHS],
+        batch_size=h_params[TESTS_CONFIG.HP_BATCH_SIZE],
         verbose=1,
         validation_data=(validate_ts, validate_value),
         callbacks=[
@@ -165,33 +141,44 @@ def run(run_name, h_params):
 
 
 session_num = 1
-total_sessions = len(HP_EPOCHS.domain.values) \
-                 * len(HP_LEARNING_RATE.domain.values) \
-                 * len(HP_BATCH_SIZE.domain.values) \
-                 * len(HP_DROPOUT.domain.values) \
-                 * len(HP_NUM_UNITS.domain.values) \
-                 * len(HP_OPTIMIZER.domain.values) \
-                 * len(HP_DENSE_LAYERS.domain.values)
+total_sessions = 1
+for i in TESTS_CONFIG:
+    total_sessions += len(TESTS_CONFIG[i].domain.values)
+    # print(i, TESTS_CONFIG[i])
+
+exit()
+
+tuning_name = 'tuning_' + str(TIMESTAMP)
+
+# config tensorboard logs
+with tf.summary.create_file_writer(f"{logs_base_dir}/{tuning_name}").as_default():
+    hp.hparams_config(
+        hparams=[HP_NUM_UNITS, HP_DROPOUT, HP_EPOCHS, HP_LEARNING_RATE, HP_DENSE_LAYERS, HP_BATCH_SIZE],
+        metrics=[
+            hp.Metric(METRIC_ACCURACY, display_name='Accuracy'),
+            hp.Metric(METRIC_LOSS, display_name='Loss'),
+            hp.Metric(METRIC_VAL_ACCURACY, display_name='VAL Accuracy'),
+            hp.Metric(METRIC_VAL_LOSS, display_name='VAL Loss')
+        ],
+    )
 
 for epoch in HP_EPOCHS.domain.values:
     for learning_rate in HP_LEARNING_RATE.domain.values:
         for batch_size in HP_BATCH_SIZE.domain.values:
             for dropout_rate in HP_DROPOUT.domain.values:
                 for num_units in HP_NUM_UNITS.domain.values:
-                    for optimizer in HP_OPTIMIZER.domain.values:
-                        for dense_layers in HP_DENSE_LAYERS.domain.values:
-                            hparams = {
-                                HP_NUM_UNITS: num_units,
-                                HP_DROPOUT: dropout_rate,
-                                HP_OPTIMIZER: optimizer,
-                                HP_EPOCHS: epoch,
-                                HP_LEARNING_RATE: learning_rate,
-                                HP_DENSE_LAYERS: dense_layers,
-                                HP_BATCH_SIZE: batch_size,
-                            }
-                            RUN_NAME = "run-%d" % session_num
-                            print(f"--- Starting trial: {RUN_NAME}")
-                            print(f"--- Session {session_num} of {total_sessions}")
-                            print({h.name: hparams[h] for h in hparams})
-                            run(RUN_NAME, hparams)
-                            session_num += 1
+                    for dense_layers in HP_DENSE_LAYERS.domain.values:
+                        hparams = {
+                            HP_NUM_UNITS: num_units,
+                            HP_DROPOUT: dropout_rate,
+                            HP_EPOCHS: epoch,
+                            HP_LEARNING_RATE: learning_rate,
+                            HP_DENSE_LAYERS: dense_layers,
+                            HP_BATCH_SIZE: batch_size,
+                        }
+                        RUN_NAME = "run-%d" % session_num
+                        print(f"--- Starting trial: {RUN_NAME}")
+                        print(f"--- Session {session_num} of {total_sessions}")
+                        print({h.name: hparams[h] for h in hparams})
+                        run(RUN_NAME, hparams)
+                        session_num += 1
