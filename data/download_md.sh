@@ -1,6 +1,16 @@
+#!/bin/bash
+# Скачиваем исторические данные по инструментам из файла figi.txt.
+# Для каждого инструмента создается отдельный файл с данными за каждый год.
+# Данные скачиваются в формате zip.
+# Для скачивания данных необходимо получить токен.
+# Подробости по получению токена: https://tinkoff.github.io/investAPI/token/
+# После получения токена необходимо сохранить его в файл .env в корне проекта.
+
+pwd
+
 while IFS== read -r key value; do
   printf -v "$key" %s "$value" && export "$key"
-done <../.env
+done < ../.env
 
 figi_list=figi.txt
 
@@ -9,7 +19,8 @@ url=https://invest-public-api.tinkoff.ru/history-data
 function download {
   local figi=$1
   local year=$2
-  local file_name=${figi}_${year}.zip
+  mkdir -p $figi
+  local file_name=${figi}/${figi}_${year}.zip
   echo "downloading $figi for year $year"
   local response_code=$(curl -s --location "${url}?figi=${figi}&year=${year}" \
       -H "Authorization: Bearer ${token}" -o "${file_name}" -w '%{http_code}\n')
@@ -32,6 +43,18 @@ function download {
   # Если данные по инструменту за указанный год не найдены.
   if [ "$response_code" = "404" ]; then
       echo "data not found for figi=${figi}, year=${year}, skipped"
+      rm $file_name
+      unzip "$figi/*.zip" -d "$figi"
+      cat $figi/*.csv > "${figi}_1m.csv"
+#      tr ';' ',' < "${figi}_1m.csv"
+
+
+      sed -i 's/;/,/g' "${figi}_1m.csv"
+      sed -i '1iDate,Open,Close,High,Low,Vol,' "${figi}_1m.csv"
+
+      rm -rf $figi
+
+
   elif [ "$response_code" != "200" ]; then
       # В случае другой ошибки - просто напишем ее в консоль и выйдем.
       echo "unspecified error with code: ${response_code}"
@@ -40,5 +63,6 @@ function download {
 }
 
 while read -r figi; do
-download "$figi" "$current_year"
+  rm -rf "$figi/"
+  download "$figi" "$current_year"
 done < ${figi_list}
