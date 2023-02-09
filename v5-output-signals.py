@@ -7,8 +7,7 @@ import tensorflow as tf
 import utils as u
 
 from keras.models import Sequential
-from keras.layers import LSTM, Dense, Dropout, Bidirectional
-from keras import activations as act
+from keras.layers import LSTM, Dense, Dropout
 from tensorboard.plugins.hparams import api as hp
 
 import os
@@ -168,7 +167,7 @@ scaled_data, cols = u.get_raw_stock_data(
     columns=['Close']
 )
 df = pd.DataFrame(scaled_data, columns=cols)
-train_data, validation_data = np.split(df.sample(frac=1), [int(.8 * len(df))])
+train_data, validation_data = np.split(df, [int(.8 * len(df))])
 
 prepared_data_dir = f"{PREPARED_DATA_DIR}/{data_file}"
 if not os.path.exists(prepared_data_dir):
@@ -177,19 +176,19 @@ if not os.path.exists(prepared_data_dir):
     for prediction_window in HP_PREDICTION_WINDOW.domain.values:
         for window_size in HP_WINDOW_SIZE.domain.values:
             # split into samples
-            train_ts, train_value = u.split_sequence(
+            TRAIN_TS, TRAIN_VALUE = u.split_sequence(
                 train_data[["Close"]].values,
                 window_size,
                 prediction_window
             )
-            validate_ts, validate_value = u.split_sequence(
+            VALIDATE_TS, VALIDATE_VALUE = u.split_sequence(
                 validation_data[["Close"]].values,
                 window_size,
                 prediction_window
             )
 
             # check if we have enough data
-            if len(train_data) * .3 > len(train_ts):
+            if len(train_data) * .3 > len(TRAIN_TS):
                 session_num += 1
                 print("Not enough data for this session. Skipping...")
                 continue
@@ -198,13 +197,13 @@ if not os.path.exists(prepared_data_dir):
             if not os.path.exists(prepared_data_pw_ws_dir):
                 os.mkdir(prepared_data_pw_ws_dir)
 
-            train_ts = train_ts.reshape((train_ts.shape[0], train_ts.shape[1], n_features))
-            validate_ts = validate_ts.reshape((validate_ts.shape[0], validate_ts.shape[1], n_features))
+            TRAIN_TS = TRAIN_TS.reshape((TRAIN_TS.shape[0], TRAIN_TS.shape[1], n_features))
+            VALIDATE_TS = VALIDATE_TS.reshape((VALIDATE_TS.shape[0], VALIDATE_TS.shape[1], n_features))
 
-            np.save(f"{prepared_data_pw_ws_dir}/train_ts.npy", train_ts)
-            np.save(f"{prepared_data_pw_ws_dir}/train_value.npy", train_value)
-            np.save(f"{prepared_data_pw_ws_dir}/validate_ts.npy", validate_ts)
-            np.save(f"{prepared_data_pw_ws_dir}/validate_value.npy", validate_value)
+            np.save(f"{prepared_data_pw_ws_dir}/train_ts.npy", TRAIN_TS)
+            np.save(f"{prepared_data_pw_ws_dir}/train_value.npy", TRAIN_VALUE)
+            np.save(f"{prepared_data_pw_ws_dir}/validate_ts.npy", VALIDATE_TS)
+            np.save(f"{prepared_data_pw_ws_dir}/validate_value.npy", VALIDATE_VALUE)
 
 else:
     print("--------------------")
@@ -217,10 +216,10 @@ for f in os.listdir(prepared_data_dir):
     prediction_window = int(prediction_window)
     window_size = int(window_size)
 
-    train_ts = np.load(f"{prepared_data_dir}/{f}/train_ts.npy")
-    train_value = np.load(f"{prepared_data_dir}/{f}/train_value.npy")
-    validate_ts = np.load(f"{prepared_data_dir}/{f}/validate_ts.npy")
-    validate_value = np.load(f"{prepared_data_dir}/{f}/validate_value.npy")
+    TRAIN_TS = np.load(f"{prepared_data_dir}/{f}/train_ts.npy")
+    TRAIN_VALUE = np.load(f"{prepared_data_dir}/{f}/train_value.npy")
+    VALIDATE_TS = np.load(f"{prepared_data_dir}/{f}/validate_ts.npy")
+    VALIDATE_VALUE = np.load(f"{prepared_data_dir}/{f}/validate_value.npy")
 
     for epoch in HP_EPOCHS.domain.values:
         for learning_rate in HP_LEARNING_RATE.domain.values:
@@ -245,6 +244,6 @@ for f in os.listdir(prepared_data_dir):
                                 print(f"--- Starting trial: {RUN_NAME}")
                                 print(f"--- Session {session_num} of {total_sessions}")
                                 print({h.name: hparams[h] for h in hparams})
-                                run(train_ts, train_value, validate_ts, validate_value,
+                                run(TRAIN_TS, TRAIN_VALUE, VALIDATE_TS, VALIDATE_VALUE,
                                     TUNING_NAME, RUN_NAME, hparams)
                                 session_num += 1

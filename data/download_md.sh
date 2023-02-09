@@ -1,17 +1,20 @@
 #!/bin/bash
-# Скачиваем исторические данные по инструментам из файла figi.txt.
-# !! ВНИМАНИЕ !! Файл figi.txt должен завершаться пустой строкой.
-# Иначе данные по последнему инструменту не будут скачаны.
+# Download historical data for instruments from the figi.txt file.
+# !! ATTENTION !! The figi.txt file must end with an empty line.
+# Otherwise, the data for the last instrument will not be downloaded.
 #
-# Для каждого инструмента создается отдельный файл с данными за каждый год.
-# Данные скачиваются в формате zip.
-# Для скачивания данных необходимо получить токен.
-# Подробости по получению токена: https://tinkoff.github.io/investAPI/token/
-# После получения токена необходимо сохранить его в файл .env в корне проекта.
+# Data saved in the format: data/ticker_figi_1m.csv
+
+# To download the data, you need to get a token.
+# Details on obtaining the token can be found at https://tinkoff.github.io/investAPI/token/.
+# After obtaining the token, it must be saved in the .env file in the root of the project:
+# TOKEN=your_token
+
+# This script based on https://github.com/Tinkoff/investAPI/tree/main/src/marketdata
 
 while IFS== read -r key value; do
   printf -v "$key" %s "$value" && export "$key"
-done < ../.env
+done <../.env
 
 figi_list=figi.txt
 
@@ -22,51 +25,55 @@ function download {
   local figi=$2
   local year=$3
 
-  # Если папка для сохранения данных не существует - создаем ее.
+  # If the folder for saving data does not exist, create it.
   mkdir -p $figi
   local file_name=${figi}/${figi}_${year}.zip
   echo "downloading $figi for year $year"
   local response_code=$(curl -s --location "${url}?figi=${figi}&year=${year}" \
-      -H "Authorization: Bearer ${token}" -o "${file_name}" -w '%{http_code}\n')
+    -H "Authorization: Bearer ${TOKEN}" -o "${file_name}" -w '%{http_code}\n')
   if [ "$response_code" = "200" ]; then
     ((year--))
-    download "$ticker" "$figi" "$year";
+    download "$ticker" "$figi" "$year"
   fi
-  # Если превышен лимит запросов в минуту (30) - повторяем запрос.
+
+  # If the limit of requests per minute (30) is exceeded - repeat the request.
   if [ "$response_code" = "429" ]; then
-      echo "rate limit exceed. sleep 5"
-      sleep 5
-      download "$ticker" "$figi" "$year";
-      return 0
+    echo "rate limit exceed. sleep 5"
+    sleep 5
+    download "$ticker" "$figi" "$year"
+    return 0
   fi
-  # Если невалидный токен - выходим.
+
+  # If the token is invalid - exit.
   if [ "$response_code" = "401" ] || [ "$response_code" = "500" ]; then
-      echo 'invalid token'
-      exit 1
+    echo 'invalid token'
+    exit 1
   fi
-  # Если данные по инструменту за указанный год не найдены.
+
+  # If data for the instrument for the specified year is not found.
   if [ "$response_code" = "404" ]; then
-      echo "data not found for figi=${figi}, year=${year}, skipped"
-      rm $file_name
-      unzip -uoq "$figi/*.zip" -d "$figi"
+    echo "data not found for figi=${figi}, year=${year}, skipped"
+    rm $file_name
+    unzip -uoq "$figi/*.zip" -d "$figi"
 
-      final_file_name="${ticker}_${figi}_1m.csv"
+    final_file_name="${ticker}_${figi}_1m.csv"
 
-      cat $figi/*.csv > $final_file_name
-      sed -i 's/;/,/g' $final_file_name
-      sed -i '1iId,Date,Open,Close,High,Low,Vol,' $final_file_name
+    cat $figi/*.csv >$final_file_name
+    sed -i 's/;/,/g' $final_file_name
+    sed -i '1iId,Date,Open,Close,High,Low,Vol,' $final_file_name
 
-      rm -rf $figi
+    rm -rf $figi
 
-
-  elif [ "$response_code" != "200" ]; then
-      # В случае другой ошибки - просто напишем ее в консоль и выйдем.
-      echo "unspecified error with code: ${response_code}"
-      exit 1
+  elif
+    [ "$response_code" != "200" ]
+  then
+    # If another error occurs - just write it to the console and exit.
+    echo "unspecified error with code: ${response_code}"
+    exit 1
   fi
 }
 
 while IFS== read -r ticker figi; do
   rm -rf "$figi/"
   download "$ticker" "$figi" "$current_year"
-done < ${figi_list}
+done <${figi_list}

@@ -1,4 +1,3 @@
-# univariate bidirectional lstm example
 import time
 
 import keras.metrics
@@ -8,8 +7,7 @@ import tensorflow as tf
 import utils as u
 
 from keras.models import Sequential
-from keras.layers import LSTM, Dense, Dropout, Bidirectional
-from keras import activations as act
+from keras.layers import LSTM, Dense, Dropout
 from tensorboard.plugins.hparams import api as hp
 
 import os
@@ -31,7 +29,8 @@ scaled_data, cols = u.get_raw_stock_data(
     columns=['Close']
 )
 df = pd.DataFrame(scaled_data, columns=cols)
-train_data, validation_data = np.split(df.sample(frac=1), [int(.8 * len(df))])
+train_data, validation_data = np.split(df, [int(.8 * len(df))])
+
 
 # print(train)
 # print(val)

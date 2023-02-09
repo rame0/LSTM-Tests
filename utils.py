@@ -1,7 +1,6 @@
 import os
 
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
 from numpy import array
 
 data_path = os.path.join(os.getcwd())
@@ -13,33 +12,6 @@ def get_stock_data(filename, folder='data'):
     """
     df = pd.read_csv(os.path.join(data_path, folder, f"{filename}"), index_col="Date", parse_dates=True)
     return df
-
-
-def get_scaled_stock_data(filename, folder='data', columns=None):
-    """
-    Gets scaled data from a symbol
-    """
-
-    if columns is None:
-        columns = ['Open', 'High', 'Low', 'Close', 'Vol']
-
-    df = get_stock_data(filename, folder)
-
-    scaler_ = MinMaxScaler(feature_range=(0, 1))
-
-    for col in columns:
-        if col not in df.columns:
-            print('No requested columns in dataset:')
-            print('Dataset cols:' + ','.join(df.columns))
-            exit()
-
-    for col in df.columns:
-        if col not in columns:
-            df = df.drop(col, axis=1)
-
-    scaled_data_ = scaler_.fit_transform(df)
-
-    return scaler_, scaled_data_, columns
 
 
 def get_raw_stock_data(filename, folder='data', columns=None):
@@ -65,9 +37,8 @@ def get_raw_stock_data(filename, folder='data', columns=None):
     return df, columns
 
 
-# split a univariate sequence
 def split_sequence(sequence, n_steps, predict_step=5):
-    X, y = list(), list()
+    x, y = list(), list()
     for i in range(len(sequence)):
         # find the end of this pattern
         end_ix = i + n_steps
@@ -91,14 +62,13 @@ def split_sequence(sequence, n_steps, predict_step=5):
         else:
             seq_y = [0, 1, 0]  # hold
 
-        X.append(seq_x)
+        x.append(seq_x)
         y.append(seq_y)
-    return array(X), array(y)
+    return array(x), array(y)
 
 
-# split a univariate sequence
 def split_sequence_v4(sequence, n_steps, predict_step=5):
-    X, y = list(), list()
+    x, y = list(), list()
     for i in range(len(sequence)):
         # find the end of this pattern
         end_ix = i + n_steps
@@ -128,6 +98,6 @@ def split_sequence_v4(sequence, n_steps, predict_step=5):
         else:
             seq_y = [0, 0, 0, 1, 0, 0, 0]  # hold
 
-        X.append(seq_x)
+        x.append(seq_x)
         y.append(seq_y)
-    return array(X), array(y)
+    return array(x), array(y)
