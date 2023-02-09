@@ -1,5 +1,6 @@
 /venv/
 /checkpoints/
+/prepared_data/
 /logs/
 /.cache/
 /.keras/
@@ -7,5 +8,6 @@
 /.nv/
 /__pycache__/
 /.idea/
+
 
 .env

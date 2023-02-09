@@ -1,4 +1,3 @@
-# univariate bidirectional lstm example
 import time
 
 import keras.metrics
@@ -14,14 +13,18 @@ from tensorboard.plugins.hparams import api as hp
 
 import os
 
-logs_base_dir = 'logs'
-checkpoints_base_dir = 'checkpoints'
+LOGS_BASE_DIR = 'logs'
+CHECKPOINTS_BASE_DIR = 'checkpoints'
+PREPARED_DATA_DIR = 'prepared_data'
 
-if not os.path.exists(logs_base_dir):
-    os.mkdir(logs_base_dir)
+if not os.path.exists(LOGS_BASE_DIR):
+    os.mkdir(LOGS_BASE_DIR)
 
-if not os.path.exists(checkpoints_base_dir):
-    os.mkdir(checkpoints_base_dir)
+if not os.path.exists(CHECKPOINTS_BASE_DIR):
+    os.mkdir(CHECKPOINTS_BASE_DIR)
+
+if not os.path.exists(PREPARED_DATA_DIR):
+    os.mkdir(PREPARED_DATA_DIR)
 
 # Config parameters
 TIMESTAMP = int(time.time())
@@ -55,7 +58,7 @@ METRIC_VAL_ACCURACY = 'val_accuracy'
 METRIC_VAL_LOSS = 'val_loss'
 
 
-def run_train(log_dir, checkpoints_dir, h_params):
+def run_train(train_ts, train_value, validate_ts, validate_value, log_dir, checkpoints_dir, h_params):
     add_layers, add_num_units = h_params[HP_ADDITIONAL_LAYERS].split(',')
 
     model = Sequential()
@@ -106,12 +109,14 @@ def run_train(log_dir, checkpoints_dir, h_params):
     return loss, accuracy, validation_loss, validation_accuracy
 
 
-def run(tuning_name, run_name, h_params):
-    run_dir = f"{logs_base_dir}/{tuning_name}/{run_name}"
-    checkpoints_dir = f"{checkpoints_base_dir}/{tuning_name}/{run_name}"
+def run(train_ts, train_value, validate_ts, validate_value, tuning_name, run_name, h_params):
+    run_dir = f"{LOGS_BASE_DIR}/{tuning_name}/{run_name}"
+    checkpoints_dir = f"{CHECKPOINTS_BASE_DIR}/{tuning_name}/{run_name}"
     with tf.summary.create_file_writer(run_dir).as_default():
         hp.hparams(h_params, trial_id=f"{tuning_name}/{run_name}")  # record the values used in this trial
-        loss, accuracy, validation_loss, validation_accuracy = run_train(run_dir, checkpoints_dir, h_params)
+        loss, accuracy, validation_loss, validation_accuracy = run_train(train_ts, train_value, validate_ts,
+                                                                         validate_value, run_dir, checkpoints_dir,
+                                                                         h_params)
 
         tf.summary.scalar(METRIC_ACCURACY, accuracy, step=1)
         tf.summary.scalar(METRIC_LOSS, loss, step=1)
@@ -137,7 +142,7 @@ print("Data file:", data_file)
 TUNING_NAME = f"{data_file}_{str(TIMESTAMP)}"
 
 # config tensorboard logs
-with tf.summary.create_file_writer(f"{logs_base_dir}/{TUNING_NAME}").as_default():
+with tf.summary.create_file_writer(f"{LOGS_BASE_DIR}/{TUNING_NAME}").as_default():
     hp.hparams_config(
         hparams=[
             HP_NUM_UNITS,
@@ -165,59 +170,81 @@ scaled_data, cols = u.get_raw_stock_data(
 df = pd.DataFrame(scaled_data, columns=cols)
 train_data, validation_data = np.split(df.sample(frac=1), [int(.8 * len(df))])
 
-for prediction_window in HP_PREDICTION_WINDOW.domain.values:
-    for window_size in HP_WINDOW_SIZE.domain.values:
-        # split into samples
-        train_ts, train_value = u.split_sequence(
-            train_data[["Close"]].values,
-            window_size,
-            prediction_window
-        )
-        validate_ts, validate_value = u.split_sequence(
-            validation_data[["Close"]].values,
-            window_size,
-            prediction_window
-        )
+prepared_data_dir = f"{PREPARED_DATA_DIR}/{data_file}"
+if not os.path.exists(prepared_data_dir):
+    os.mkdir(prepared_data_dir)
 
-        # check if we have enough data
-        if len(train_data) * .3 > len(train_ts):
-            session_num += 1
-            print("Not enough data for this session. Skipping...")
-            continue
+    for prediction_window in HP_PREDICTION_WINDOW.domain.values:
+        for window_size in HP_WINDOW_SIZE.domain.values:
+            # split into samples
+            train_ts, train_value = u.split_sequence(
+                train_data[["Close"]].values,
+                window_size,
+                prediction_window
+            )
+            validate_ts, validate_value = u.split_sequence(
+                validation_data[["Close"]].values,
+                window_size,
+                prediction_window
+            )
 
-        print("----------------%s------------------" % len(train_data))
-        print("----------------%s------------------" % len(train_ts))
-        print("--- prediction_window:%s --- windows_size:%s ---" % (prediction_window, window_size))
-        print("buy:", len([a for a in train_value if np.array_equal(a, [0, 0, 1])]))
-        print("hold:", len([a for a in train_value if np.array_equal(a, [0, 1, 0])]))
-        print("sell:", len([a for a in train_value if np.array_equal(a, [1, 0, 0])]))
-        print('----------------------------------')
+            # check if we have enough data
+            if len(train_data) * .3 > len(train_ts):
+                session_num += 1
+                print("Not enough data for this session. Skipping...")
+                continue
 
-        train_ts = train_ts.reshape((train_ts.shape[0], train_ts.shape[1], n_features))
-        validate_ts = validate_ts.reshape((validate_ts.shape[0], validate_ts.shape[1], n_features))
+            prepared_data_pw_ws_dir = f"{prepared_data_dir}/{prediction_window}_{window_size}/"
+            if not os.path.exists(prepared_data_pw_ws_dir):
+                os.mkdir(prepared_data_pw_ws_dir)
 
-        for epoch in HP_EPOCHS.domain.values:
-            for learning_rate in HP_LEARNING_RATE.domain.values:
-                for batch_size in HP_BATCH_SIZE.domain.values:
-                    for dropout_rate in HP_DROPOUT.domain.values:
-                        for num_units in HP_NUM_UNITS.domain.values:
-                            for dense_layers in HP_DENSE_LAYERS.domain.values:
-                                for additional_layers in HP_ADDITIONAL_LAYERS.domain.values:
-                                    hparams = {
-                                        HP_PREDICTION_WINDOW: prediction_window,
-                                        HP_WINDOW_SIZE: window_size,
-                                        HP_ADDITIONAL_LAYERS: additional_layers,
-                                        HP_NUM_UNITS: num_units,
-                                        HP_DROPOUT: dropout_rate,
-                                        HP_EPOCHS: epoch,
-                                        HP_LEARNING_RATE: learning_rate,
-                                        HP_DENSE_LAYERS: dense_layers,
-                                        HP_BATCH_SIZE: batch_size,
-                                    }
+            train_ts = train_ts.reshape((train_ts.shape[0], train_ts.shape[1], n_features))
+            validate_ts = validate_ts.reshape((validate_ts.shape[0], validate_ts.shape[1], n_features))
 
-                                    RUN_NAME = "run-%d" % session_num
-                                    print(f"--- Starting trial: {RUN_NAME}")
-                                    print(f"--- Session {session_num} of {total_sessions}")
-                                    print({h.name: hparams[h] for h in hparams})
-                                    run(TUNING_NAME, RUN_NAME, hparams)
-                                    session_num += 1
+            np.save(f"{prepared_data_pw_ws_dir}/train_ts.npy", train_ts)
+            np.save(f"{prepared_data_pw_ws_dir}/train_value.npy", train_value)
+            np.save(f"{prepared_data_pw_ws_dir}/validate_ts.npy", validate_ts)
+            np.save(f"{prepared_data_pw_ws_dir}/validate_value.npy", validate_value)
+
+else:
+    print("--------------------")
+    print("Data already prepared. Skipping preparing...")
+    print(f"Remove '{prepared_data_dir}' if you want to re-prepare the data.")
+    print("--------------------")
+
+for f in os.listdir(prepared_data_dir):
+    prediction_window, window_size = f.split("_")
+    prediction_window = int(prediction_window)
+    window_size = int(window_size)
+
+    train_ts = np.load(f"{prepared_data_dir}/{f}/train_ts.npy")
+    train_value = np.load(f"{prepared_data_dir}/{f}/train_value.npy")
+    validate_ts = np.load(f"{prepared_data_dir}/{f}/validate_ts.npy")
+    validate_value = np.load(f"{prepared_data_dir}/{f}/validate_value.npy")
+
+    for epoch in HP_EPOCHS.domain.values:
+        for learning_rate in HP_LEARNING_RATE.domain.values:
+            for batch_size in HP_BATCH_SIZE.domain.values:
+                for dropout_rate in HP_DROPOUT.domain.values:
+                    for num_units in HP_NUM_UNITS.domain.values:
+                        for dense_layers in HP_DENSE_LAYERS.domain.values:
+                            for additional_layers in HP_ADDITIONAL_LAYERS.domain.values:
+                                hparams = {
+                                    HP_PREDICTION_WINDOW: prediction_window,
+                                    HP_WINDOW_SIZE: window_size,
+                                    HP_ADDITIONAL_LAYERS: additional_layers,
+                                    HP_NUM_UNITS: num_units,
+                                    HP_DROPOUT: dropout_rate,
+                                    HP_EPOCHS: epoch,
+                                    HP_LEARNING_RATE: learning_rate,
+                                    HP_DENSE_LAYERS: dense_layers,
+                                    HP_BATCH_SIZE: batch_size,
+                                }
+
+                                RUN_NAME = "run-%d" % session_num
+                                print(f"--- Starting trial: {RUN_NAME}")
+                                print(f"--- Session {session_num} of {total_sessions}")
+                                print({h.name: hparams[h] for h in hparams})
+                                run(train_ts, train_value, validate_ts, validate_value,
+                                    TUNING_NAME, RUN_NAME, hparams)
+                                session_num += 1
