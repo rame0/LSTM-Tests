@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-apt udpate
+apt update
 apt upgrade -y
 apt install -y vim tmux htop
 
