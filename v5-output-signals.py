@@ -1,3 +1,4 @@
+import random
 import time
 
 import keras.metrics
@@ -28,7 +29,8 @@ if not os.path.exists(PREPARED_DATA_DIR):
 # Config parameters
 TIMESTAMP = int(time.time())
 n_features = 1
-data_file = 'MVID_BBG004S68CP5_1m.csv'
+data_file = 'SPBE_BBG002GHV6L9_1m.csv'
+# data_file = 'MVID_BBG004S68CP5_1m.csv'
 
 # Config hyperparameters
 HP_ADDITIONAL_LAYERS = hp.HParam('additional_layers', hp.Discrete([
@@ -162,30 +164,40 @@ with tf.summary.create_file_writer(f"{LOGS_BASE_DIR}/{TUNING_NAME}").as_default(
         ],
     )
 
+columns = ['Close', 'Vol']
+
 scaled_data, cols = u.get_raw_stock_data(
     data_file,
-    columns=['Close']
+    columns=columns
 )
 df = pd.DataFrame(scaled_data, columns=cols)
-train_data, validation_data = np.split(df, [int(.8 * len(df))])
 
 prepared_data_dir = f"{PREPARED_DATA_DIR}/{data_file}"
 if not os.path.exists(prepared_data_dir):
-    os.mkdir(prepared_data_dir)
+    # os.mkdir(prepared_data_dir)
 
     for prediction_window in HP_PREDICTION_WINDOW.domain.values:
         for window_size in HP_WINDOW_SIZE.domain.values:
             # split into samples
-            TRAIN_TS, TRAIN_VALUE = u.split_sequence(
-                train_data[["Close"]].values,
+            # DF_TS, DF_VALUE = u.split_sequence(
+            X, Y = u.split_sequence_v5(
+                df,
+                columns,
+                "Close",
                 window_size,
                 prediction_window
             )
-            VALIDATE_TS, VALIDATE_VALUE = u.split_sequence(
-                validation_data[["Close"]].values,
-                window_size,
-                prediction_window
-            )
+
+            random.shuffle(X)
+            print(X)
+            print(len(X))
+            exit()
+
+            # VALIDATE_TS, VALIDATE_VALUE = u.split_sequence(
+            #     validation_data[["Close"]].values,
+            #     window_size,
+            #     prediction_window
+            # )
 
             # check if we have enough data
             if len(train_data) * .3 > len(TRAIN_TS):
